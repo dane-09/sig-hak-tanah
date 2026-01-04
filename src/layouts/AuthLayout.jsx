@@ -1,23 +1,33 @@
 import { Outlet } from "react-router-dom";
 
 export default function AuthLayout() {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-                <div className="flex items-center justify-center mb-6">
-                    <h1 className="text-4xl font-poppins font-extrabold text-gray-800">
-                        <span className="text-black">Sedap</span>
-                        <span className="text-green-500">.</span>
-                    </h1>
-                </div>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#091242]">
+      <div className="relative w-full max-w-md rounded-3xl bg-white shadow-xl overflow-hidden">
 
-                <Outlet/>
+        {/* TOP ACCENT */}
+        <div className="h-2 bg-[#f59e0b]" />
 
-                <p className="text-center text-sm text-gray-500 mt-6">
-                    © 2025 Sedap Restaurant Admin Dashboard. All rights
-                    reserved.
-                </p>
-            </div>
+        <div className="p-8">
+          {/* TITLE */}
+          <div className="flex flex-col items-center mb-6">
+            <h1 className="text-3xl font-black text-[#273270] tracking-tight">
+              SIG Hak Tanah
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">
+              Sistem Informasi Geografis
+            </p>
+          </div>
+
+          {/* FORM CONTENT */}
+          <Outlet />
+
+          {/* FOOTER */}
+          <p className="text-center text-xs text-gray-400 mt-8">
+            © 2025 Sistem Informasi Geografis Hak Tanah
+          </p>
         </div>
-    )
+      </div>
+    </div>
+  );
 }

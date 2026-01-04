@@ -1,23 +1,44 @@
 import "./assets/tailwind.css";
-import { Route, Routes } from "react-router-dom";
-import MainLayout from "./layouts/MainLayout.jsx";
-import Loading from "./components/Loading.jsx";
+import { Routes, Route } from "react-router-dom";
 import React, { Suspense } from "react";
-import MapView from "./components/HakTanahMap.jsx";
-import UserGuide from "./components/UserGuide.jsx";
-import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
 
-const Dashboard = React.lazy(() => import("./pages/Home.jsx"));
+import MainLayout from "./layouts/MainLayout";
+import GuestLayout from "./layouts/GuestLayout";
+import Loading from "./components/Loading";
+
+import Home from "./pages/Home";
+import AdminDashboard from "./pages/AdminDashboard";
+import MapView from "./components/HakTanahMap";
+import UserGuide from "./components/UserGuide";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import ListData from "./components/auth/listdata";
+import AuthLayout from "./layouts/AuthLayout";
+import Login from "./components/auth/login";
+
 function App() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
+
+        {/* MAIN LAYOUT */}
         <Route element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/Map" element={<MapView />} />
-           <Route path="/Panduan-Pengguna" element={<UserGuide />} />
-            <Route path="/kebijakan-Privasi" element={<PrivacyPolicy />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/map" element={<MapView />} />
+          <Route path="/panduan-pengguna" element={<UserGuide />} />
+          <Route path="/kebijakan-privasi" element={<PrivacyPolicy />} />
+         
         </Route>
+
+        {/* GUEST LAYOUT (contoh: login nanti) */}
+        <Route element={<GuestLayout />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/list" element={<ListData />} />
+        </Route>
+
+ <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+        </Route>
+
       </Routes>
     </Suspense>
   );
