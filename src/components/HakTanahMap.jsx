@@ -18,9 +18,7 @@ const landStyles = {
 
 export default function MapHakTanah() {
   const [geoData, setGeoData] = useState(null);
-  const [activeFilters, setActiveFilters] = useState(
-    Object.keys(landStyles) // ⬅️ TANPA default
-  );
+  const [activeFilters, setActiveFilters] = useState(Object.keys(landStyles));
 
   /* ================= FETCH DATA ================= */
   useEffect(() => {
@@ -30,46 +28,23 @@ export default function MapHakTanah() {
       .catch(console.error);
   }, []);
 
-  /* ================= FILTER DATA (FIX UTAMA) ================= */
-  const filteredGeoJSON = useMemo(() => {
-    if (!geoData?.features) return null;
-
-    return {
-      ...geoData,
-      features: geoData.features.filter((f) =>
-        activeFilters.includes(f.properties.TIPEHAK)
-      ),
-    };
-  }, [geoData, activeFilters]);
-
-  /* ================= STATISTIK ================= */
-  const areaSummary = useMemo(() => {
+  /* ================= FILTER DATA (LOGIC FIX) ================= */
+  const filteredFeatures = useMemo(() => {
     if (!geoData?.features) return [];
-
-    const map = {};
-    geoData.features.forEach((f) => {
-      const tipe = f.properties.TIPEHAK;
-      if (!activeFilters.includes(tipe)) return;
-
-      map[tipe] = (map[tipe] || 0) + turf.area(f);
-    });
-
-    return Object.entries(map).map(([name, value]) => ({
-      name,
-      value,
-      ...(landStyles[name]),
-    }));
+    return geoData.features.filter((f) =>
+      activeFilters.includes(f.properties.TIPEHAK)
+    );
   }, [geoData, activeFilters]);
 
-  /* ================= STYLE ================= */
+  /* ================= STYLE & POPUP ================= */
   const styleFeature = (feature) => {
     const tipe = feature.properties.TIPEHAK;
-    const s = landStyles[tipe];
+    const s = landStyles[tipe] || { color: "#333", fill: "#999" };
     return {
       color: s.color,
       fillColor: s.fill,
-      weight: 1.5,
-      fillOpacity: 0.7,
+      weight: 2,
+      fillOpacity: 0.6,
     };
   };
 
@@ -78,9 +53,11 @@ export default function MapHakTanah() {
     const area = Math.round(turf.area(feature));
 
     layer.bindPopup(`
-      <strong>${TIPEHAK}</strong><br/>
-      ID: ${FID}<br/>
-      Luas: ${area.toLocaleString("id-ID")} m²
+      <div style="font-family: sans-serif;">
+        <h4 style="margin: 0 0 5px 0; color: #1e293b;">${TIPEHAK}</h4>
+        <p style="margin: 0; font-size: 12px;"><b>ID:</b> ${FID}</p>
+        <p style="margin: 0; font-size: 12px;"><b>Luas:</b> ${area.toLocaleString("id-ID")} m²</p>
+      </div>
     `);
   };
 
@@ -92,71 +69,95 @@ export default function MapHakTanah() {
     );
   };
 
-  /* ================= COUNT ================= */
-  const filteredCount = filteredGeoJSON?.features.length || 0;
-
   return (
-    <div className="flex w-full h-screen bg-slate-100 p-3 gap-3">
+    <div className="flex w-full h-screen bg-slate-50 p-4 gap-4 font-sans text-slate-900">
       {/* SIDEBAR */}
-      <div className="w-96 space-y-4 overflow-y-auto">
-        <div className="bg-white p-4 rounded-xl shadow">
-          <p className="text-xs font-bold uppercase mb-4">
-            Legenda & Filter
+      <div className="w-80 flex flex-col gap-4 flex-shrink-0">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-lg font-bold mb-1">SIG Hak Tanah</h2>
+          <p className="text-xs text-slate-500 mb-6 font-medium tracking-wide uppercase">
+            Legenda & Filter Layer
           </p>
 
-          {Object.entries(landStyles).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => toggleFilter(key)}
-              className={`w-full flex items-center justify-between p-2 rounded mb-2 border
-                ${
-                  activeFilters.includes(key)
-                    ? "bg-white shadow"
-                    : "bg-slate-50 opacity-40"
-                }`}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-4 h-4"
-                  style={{
-                    backgroundColor: val.fill,
-                    border: `1px solid ${val.color}`,
-                  }}
-                />
-                <span className="text-xs font-bold">{val.label}</span>
-              </div>
-            </button>
-          ))}
+          <div className="space-y-2">
+            {Object.entries(landStyles).map(([key, val]) => {
+              const isActive = activeFilters.includes(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleFilter(key)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${
+                    isActive
+                      ? "bg-white border-slate-200 shadow-sm opacity-100"
+                      : "bg-slate-50 border-transparent opacity-40 hover:opacity-60"
+                  }`}
+                >
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{
+                      backgroundColor: val.fill,
+                      border: `2px solid ${val.color}`,
+                    }}
+                  />
+                  <div className="text-left">
+                    <p className="text-xs font-bold leading-none">{val.label}</p>
+                    <p className="text-[10px] text-slate-500 mt-1 truncate w-40">{key}</p>
+                  </div>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="bg-slate-900 text-white p-4 rounded-xl">
-          <p className="text-xs uppercase">Bidang Terpilih</p>
-          <p className="text-3xl font-black">{filteredCount}</p>
+        {/* STATS CARD */}
+        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
+            Total Bidang Terpilih
+          </p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-black">{filteredFeatures.length}</span>
+            <span className="text-sm text-slate-400 font-medium">Unit</span>
+          </div>
         </div>
       </div>
 
-      {/* MAP */}
-      <div className="flex-1 rounded-xl overflow-hidden bg-white">
+      {/* MAP AREA */}
+      <div className="flex-1 rounded-[2rem] overflow-hidden bg-white shadow-inner border border-slate-200 relative">
         <MapContainer
           center={[0.4464, 101.3694]}
           zoom={16}
           zoomControl={false}
-          className="w-full h-full"
+          className="w-full h-full z-0"
         >
           <TileLayer
-            attribution="&copy; OpenStreetMap"
+            attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <ZoomControl position="bottomright" />
 
-          {filteredGeoJSON && (
+          {/* FIX UTAMA: Penggunaan Key agar GeoJSON me-render ulang saat filter berubah */}
+          {geoData && (
             <GeoJSON
-              data={filteredGeoJSON}
+              key={activeFilters.join("-")}
+              data={{ type: "FeatureCollection", features: filteredFeatures }}
               style={styleFeature}
               onEachFeature={onEachFeature}
             />
           )}
         </MapContainer>
+        
+        {/* Indikator Loading di Peta */}
+        {!geoData && (
+          <div className="absolute inset-0 bg-slate-100/50 backdrop-blur-sm z-10 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-sm font-bold text-slate-600">Memuat Data Spasial...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
