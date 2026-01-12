@@ -14,6 +14,7 @@ import PrivacyPolicy from "./components/PrivacyPolicy";
 import ListData from "./components/auth/listdata";
 import AuthLayout from "./layouts/AuthLayout";
 import Login from "./components/auth/login";
+import InfoHakTanah from "./components/InfoHakTanah";
 
 function App() {
   return (
@@ -26,7 +27,7 @@ function App() {
           <Route path="/map" element={<MapView />} />
           <Route path="/panduan-pengguna" element={<UserGuide />} />
           <Route path="/kebijakan-privasi" element={<PrivacyPolicy />} />
-         
+          <Route path="/infomarsi-hak-tanah" element={<InfoHakTanah />} /> 
         </Route>
 
         {/* GUEST LAYOUT (contoh: login nanti) */}

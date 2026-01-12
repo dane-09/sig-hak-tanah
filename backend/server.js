@@ -5,126 +5,59 @@ const cors = require("cors");
 
 const app = express();
 const PORT = 3001;
-const LIMIT = 10;
 
-// middleware
 app.use(cors());
 app.use(express.json());
 
-// path ke file json
-const DATA_FILE = path.join(__dirname, "data", "hak_tanah_fix.json");
+const DATA_FILE = path.join(__dirname, "data", "HakTanahPekanbaru.json");
 
-/* ===============================
-   HELPER
-================================ */
-const readJSON = () => {
-  const raw = fs.readFileSync(DATA_FILE);
-  return JSON.parse(raw);
-};
+const readJSON = () => JSON.parse(fs.readFileSync(DATA_FILE));
+const writeJSON = (data) => fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 
-const writeJSON = (data) => {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-};
-
-
+// GET ALL
 app.get("/hak-tanah/all", (req, res) => {
   try {
-    const data = readJSON();
-    res.json(data); 
+    res.json(readJSON());
   } catch (err) {
     res.status(500).json({ message: "Gagal membaca data" });
   }
 });
 
-
-app.get("/hak-tanah", (req, res) => {
-  try {
-    const data = readJSON();
-    const page = parseInt(req.query.page) || 1;
-
-    const startIndex = (page - 1) * LIMIT;
-    const endIndex = startIndex + LIMIT;
-
-    res.json({
-      page,
-      limit: LIMIT,
-      totalData: data.features.length,
-      totalPages: Math.ceil(data.features.length / LIMIT),
-      features: data.features.slice(startIndex, endIndex),
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Gagal membaca data" });
-  }
-});
-
-/* ===============================
-   CREATE
-================================ */
+// CREATE
 app.post("/hak-tanah", (req, res) => {
   try {
     const data = readJSON();
+    const { TIPEHAK, Kecamatan } = req.body.properties;
 
     const newFeature = {
       id: Date.now(),
       type: "Feature",
-      properties: req.body.properties,
       geometry: req.body.geometry,
+      properties: {
+        FID: data.features.length > 0 ? Math.max(...data.features.map(f => f.properties.FID || 0)) + 1 : 1,
+        TIPEHAK: TIPEHAK,
+        Kecamatan: Kecamatan
+      }
     };
 
     data.features.push(newFeature);
     writeJSON(data);
-
-    res.json({ message: "Data berhasil ditambahkan", data: newFeature });
+    res.json({ message: "Berhasil simpan", data: newFeature });
   } catch (err) {
-    res.status(500).json({ message: "Gagal menambah data" });
+    res.status(500).json({ message: "Gagal simpan" });
   }
 });
 
-/* ===============================
-   UPDATE
-================================ */
-app.put("/hak-tanah/:id", (req, res) => {
-  try {
-    const data = readJSON();
-    const id = parseInt(req.params.id);
-
-    const index = data.features.findIndex((f) => f.id === id);
-    if (index === -1)
-      return res.status(404).json({ message: "Data tidak ditemukan" });
-
-    data.features[index] = {
-      ...data.features[index],
-      properties: req.body.properties,
-      geometry: req.body.geometry,
-    };
-
-    writeJSON(data);
-    res.json({ message: "Data berhasil diupdate" });
-  } catch (err) {
-    res.status(500).json({ message: "Gagal update data" });
-  }
-});
-
-/* ===============================
-   DELETE
-================================ */
+// DELETE
 app.delete("/hak-tanah/:id", (req, res) => {
   try {
     const data = readJSON();
-    const id = parseInt(req.params.id);
-
-    data.features = data.features.filter((f) => f.id !== id);
+    data.features = data.features.filter((f) => f.id !== parseInt(req.params.id));
     writeJSON(data);
-
-    res.json({ message: "Data berhasil dihapus" });
+    res.json({ message: "Berhasil hapus" });
   } catch (err) {
-    res.status(500).json({ message: "Gagal hapus data" });
+    res.status(500).json({ message: "Gagal hapus" });
   }
 });
 
-/* ===============================
-   SERVER
-================================ */
-app.listen(PORT, () => {
-  console.log(`🚀 API berjalan di http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 API: http://localhost:${PORT}`));

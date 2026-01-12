@@ -132,6 +132,7 @@ export default function Home() {
               {[
                 { name: 'Panduan Pengguna', path: '/panduan-Pengguna' },
                 { name: 'Kebijakan Privasi', path: '/Kebijakan-Privasi' },
+                  { name: 'Informasi Hak Tanah', path: '/infomarsi-hak-tanah' },
               ].map((item) => (
                 <Link 
                   key={item.name} 

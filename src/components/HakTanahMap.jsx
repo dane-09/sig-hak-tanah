@@ -4,9 +4,12 @@ import {
   TileLayer,
   GeoJSON,
   ZoomControl,
+  useMap,
+  LayersControl,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import * as turf from "@turf/turf";
+import { FiFilter, FiLayers, FiCheckCircle } from "react-icons/fi";
 
 const landStyles = {
   "Hak Guna Bangunan": { color: "#1e40af", fill: "#3b82f6", label: "HGB" },
@@ -16,11 +19,26 @@ const landStyles = {
   "Hak Wakaf": { color: "#5b21b6", fill: "#8b5cf6", label: "Wakaf" },
 };
 
+/* ===== AUTO FIT BOUNDS ===== */
+function FitBounds({ data }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (data && data.features.length > 0) {
+      const bounds = L.geoJSON(data).getBounds();
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [data, map]);
+
+  return null;
+}
+
 export default function MapHakTanah() {
   const [geoData, setGeoData] = useState(null);
   const [activeFilters, setActiveFilters] = useState(Object.keys(landStyles));
+  const [selectedKecamatan, setSelectedKecamatan] = useState([]);
 
-  /* ================= FETCH DATA ================= */
+  /* ===== FETCH DATA ===== */
   useEffect(() => {
     fetch("http://localhost:3001/hak-tanah/all")
       .then((res) => res.json())
@@ -28,15 +46,27 @@ export default function MapHakTanah() {
       .catch(console.error);
   }, []);
 
-  /* ================= FILTER DATA (LOGIC FIX) ================= */
+  /* ===== LIST KECAMATAN ===== */
+  const listKecamatan = useMemo(() => {
+    if (!geoData?.features) return [];
+    return [...new Set(geoData.features.map(f => f.properties.Kecamatan))]
+      .filter(Boolean)
+      .sort();
+  }, [geoData]);
+
+  /* ===== FILTER DATA ===== */
   const filteredFeatures = useMemo(() => {
     if (!geoData?.features) return [];
-    return geoData.features.filter((f) =>
-      activeFilters.includes(f.properties.TIPEHAK)
-    );
-  }, [geoData, activeFilters]);
+    return geoData.features.filter((f) => {
+      const matchHak = activeFilters.includes(f.properties.TIPEHAK);
+      const matchKec =
+        selectedKecamatan.length === 0 ||
+        selectedKecamatan.includes(f.properties.Kecamatan);
+      return matchHak && matchKec;
+    });
+  }, [geoData, activeFilters, selectedKecamatan]);
 
-  /* ================= STYLE & POPUP ================= */
+  /* ===== STYLE FEATURE ===== */
   const styleFeature = (feature) => {
     const tipe = feature.properties.TIPEHAK;
     const s = landStyles[tipe] || { color: "#333", fill: "#999" };
@@ -48,116 +78,158 @@ export default function MapHakTanah() {
     };
   };
 
+  /* ===== POPUP ===== */
   const onEachFeature = (feature, layer) => {
-    const { FID, TIPEHAK } = feature.properties;
+    const { TIPEHAK, Kecamatan } = feature.properties;
     const area = Math.round(turf.area(feature));
 
     layer.bindPopup(`
-      <div style="font-family: sans-serif;">
-        <h4 style="margin: 0 0 5px 0; color: #1e293b;">${TIPEHAK}</h4>
-        <p style="margin: 0; font-size: 12px;"><b>ID:</b> ${FID}</p>
-        <p style="margin: 0; font-size: 12px;"><b>Luas:</b> ${area.toLocaleString("id-ID")} m²</p>
+      <div style="font-family:sans-serif; min-width:160px">
+        <b style="color:#1e293b">${TIPEHAK}</b>
+        <hr style="margin:6px 0"/>
+        <small>Kecamatan: ${Kecamatan}</small><br/>
+        <small>Luas: ${area.toLocaleString("id-ID")} m²</small>
       </div>
     `);
   };
 
-  const toggleFilter = (tipe) => {
-    setActiveFilters((prev) =>
-      prev.includes(tipe)
-        ? prev.filter((t) => t !== tipe)
-        : [...prev, tipe]
+  const toggleKecamatan = (kec) => {
+    setSelectedKecamatan(prev =>
+      prev.includes(kec)
+        ? prev.filter(k => k !== kec)
+        : [...prev, kec]
     );
   };
 
   return (
-    <div className="flex w-full h-screen bg-slate-50 p-4 gap-4 font-sans text-slate-900">
-      {/* SIDEBAR */}
-      <div className="w-80 flex flex-col gap-4 flex-shrink-0">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold mb-1">SIG Hak Tanah</h2>
-          <p className="text-xs text-slate-500 mb-6 font-medium tracking-wide uppercase">
-            Legenda & Filter Layer
-          </p>
+    <div className="flex flex-col md:flex-row w-full h-screen bg-slate-50 p-4 gap-4 overflow-hidden font-sans">
 
-          <div className="space-y-2">
-            {Object.entries(landStyles).map(([key, val]) => {
-              const isActive = activeFilters.includes(key);
-              return (
-                <button
-                  key={key}
-                  onClick={() => toggleFilter(key)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${
-                    isActive
-                      ? "bg-white border-slate-200 shadow-sm opacity-100"
-                      : "bg-slate-50 border-transparent opacity-40 hover:opacity-60"
-                  }`}
-                >
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{
-                      backgroundColor: val.fill,
-                      border: `2px solid ${val.color}`,
-                    }}
-                  />
-                  <div className="text-left">
-                    <p className="text-xs font-bold leading-none">{val.label}</p>
-                    <p className="text-[10px] text-slate-500 mt-1 truncate w-40">{key}</p>
-                  </div>
-                  {isActive && (
-                    <div className="ml-auto w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                  )}
-                </button>
-              );
-            })}
+      {/* ===== SIDEBAR ===== */}
+      <div className="w-full md:w-80 flex flex-col gap-4 overflow-y-auto pr-1">
+
+        {/* Filter Jenis Hak */}
+        <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200">
+          <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+            <FiLayers className="text-indigo-600" /> Jenis Hak
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(landStyles).map(([key, val]) => (
+              <button
+                key={key}
+                onClick={() =>
+                  setActiveFilters(prev =>
+                    prev.includes(key)
+                      ? prev.filter(t => t !== key)
+                      : [...prev, key]
+                  )
+                }
+                className={`text-[10px] px-3 py-2 rounded-full font-bold border transition-all ${
+                  activeFilters.includes(key)
+                    ? "bg-indigo-600 border-indigo-600 text-white"
+                    : "bg-white text-slate-400 border-slate-200"
+                }`}
+              >
+                {val.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* STATS CARD */}
-        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
-            Total Bidang Terpilih
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-black">{filteredFeatures.length}</span>
-            <span className="text-sm text-slate-400 font-medium">Unit</span>
+        {/* Filter Kecamatan */}
+        <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+          <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+            <FiFilter className="text-indigo-600" /> Filter Kecamatan
+          </h3>
+          <div className="space-y-1 overflow-y-auto">
+            {listKecamatan.map(kec => (
+              <button
+                key={kec}
+                onClick={() => toggleKecamatan(kec)}
+                className={`w-full text-left p-3 rounded-xl text-xs font-bold flex justify-between items-center ${
+                  selectedKecamatan.includes(kec)
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "hover:bg-slate-50 text-slate-500"
+                }`}
+              >
+                {kec}
+                {selectedKecamatan.includes(kec) && <FiCheckCircle />}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {/* Info */}
+        <div className="bg-slate-900 text-white p-6 rounded-[2rem]">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            Total Terpilih
+          </p>
+          <p className="text-4xl font-black mt-1 text-indigo-400">
+            {filteredFeatures.length}
+          </p>
         </div>
       </div>
 
-      {/* MAP AREA */}
-      <div className="flex-1 rounded-[2rem] overflow-hidden bg-white shadow-inner border border-slate-200 relative">
+      {/* ===== MAP AREA ===== */}
+      <div className="flex-1 rounded-[2.5rem] overflow-hidden bg-slate-200 shadow-xl border border-slate-200 relative">
+
         <MapContainer
           center={[0.4464, 101.3694]}
-          zoom={16}
+          zoom={15}
           zoomControl={false}
-          className="w-full h-full z-0"
+          className="w-full h-full z-0 saturate-110"
         >
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <LayersControl position="topright">
+
+            <LayersControl.BaseLayer checked name="Street View">
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="&copy; OpenStreetMap"
+              />
+            </LayersControl.BaseLayer>
+
+          </LayersControl>
+
           <ZoomControl position="bottomright" />
 
-          {/* FIX UTAMA: Penggunaan Key agar GeoJSON me-render ulang saat filter berubah */}
           {geoData && (
-            <GeoJSON
-              key={activeFilters.join("-")}
-              data={{ type: "FeatureCollection", features: filteredFeatures }}
-              style={styleFeature}
-              onEachFeature={onEachFeature}
-            />
+            <>
+              <FitBounds data={{ type: "FeatureCollection", features: filteredFeatures }} />
+              <GeoJSON
+                key={`${activeFilters.join()}-${selectedKecamatan.join()}`}
+                data={{ type: "FeatureCollection", features: filteredFeatures }}
+                style={styleFeature}
+                onEachFeature={onEachFeature}
+              />
+            </>
           )}
         </MapContainer>
-        
-        {/* Indikator Loading di Peta */}
-        {!geoData && (
-          <div className="absolute inset-0 bg-slate-100/50 backdrop-blur-sm z-10 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-sm font-bold text-slate-600">Memuat Data Spasial...</p>
-            </div>
-          </div>
-        )}
+
+        {/* 🌿 GREEN ZONE SHADING (ALA GOOGLE MAPS) */}
+        <div className="pointer-events-none absolute inset-0 z-[4]">
+          <div
+            className="
+              absolute -top-1/3 -left-1/3 w-[160%] h-[160%]
+              bg-[radial-gradient(ellipse_at_center,_rgba(34,197,94,0.35),_transparent_65%)]
+              animate-pulse
+            "
+          />
+          <div
+            className="
+              absolute top-1/3 left-1/4 w-[140%] h-[140%]
+              bg-[radial-gradient(ellipse_at_center,_rgba(22,163,74,0.25),_transparent_70%)]
+              animate-pulse
+            "
+          />
+        </div>
+
+        {/* Floating Title */}
+        <div className="absolute top-6 left-6 z-10 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg">
+          <p className="text-[10px] font-black text-slate-800 flex items-center gap-2">
+            <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
+            SISTEM INFORMASI GEOGRAFIS PEKANBARU
+          </p>
+        </div>
+
       </div>
     </div>
   );
